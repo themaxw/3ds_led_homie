@@ -16,15 +16,21 @@
 #define SOC_ALIGN 0x1000
 #define SOC_BUFFERSIZE 0x100000
 
+#define SIZE_TOUCH_X 320
+#define SIZE_TOUCH_Y 240
+
+
 
 static u32* SOC_buffer = NULL;
 
 __attribute__((format(printf, 1, 2))) void failExit(const char* fmt, ...);
 
-// const static char ip[] = "192.168.0.111";
-const static char ip[] = "127.0.0.1";
+char ip[] = "192.168.0.255";
+
+
+// const static char ip[] = "127.0.0.1";
 #define SERVERPORT "6901"
-#define BUFLEN 213
+#define BUFLEN 3
 char buf[BUFLEN];
 
 int sockfd = -1;
@@ -77,56 +83,71 @@ int main(int argc, char** argv) {
 
 	// libctru provides BSD sockets so most code from here is standard
 
-	while (aptMainLoop() &&
-		(rv = getaddrinfo(ip, SERVERPORT, &hints, &servinfo)) != 0) {
-		gspWaitForVBlank();
-		printf("waruuum 0x%s\n", gai_strerror(rv));
 
-		// failExit("getaddrinfo:  0x%08X\n", (unsigned int) gai_strerror(rv));
+
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		failExit("talker: socket");
 	}
 
-	for (p = servinfo; p != NULL; p = p->ai_next) {
-		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-			perror("talker: socket");
-			continue;
-		}
+	int broadcastEnable = 1;
+	setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
 
-		break;
-	}
-
-	if (p == NULL) {
-		failExit("talker: failed to create socket\n");
-	}
+	// if (p == NULL) {
+	// 	failExit("talker: failed to create socket\n");
+	// }
 
 	// if ((numbytes = sendto(sockfd, buf, strlen(buf), 0,
 	//          p->ai_addr, p->ai_addrlen)) == -1) {
 	//     printf("[error] send gefailed");
 	// }
-	printf("helo\n");
+	unsigned int counter = 0;
+
+	if ((rv = getaddrinfo(ip, SERVERPORT, &hints, &servinfo)) != 0) {
+		printf("get_addr_info %s\n", gai_strerror(rv));
+	}
 
 	while (aptMainLoop()) {
 		gspWaitForVBlank();
+
 		hidScanInput();
 
 		touchPosition touch;
 
 		// Read the touch screen coordinates
 		hidTouchRead(&touch);
-		printf("\x1b\n[2;0H%03d; %03d", touch.px, touch.py);
+		// printf("\x1b\n[2;0H%03d; %03d", touch.px, touch.py);
 
-		for (size_t i = 0; i < BUFLEN; i++) {
-			char val = 0;
-			if (i % 3 == 0)
-				val = (char)touch.px;
-			else if (i % 3 == 1)
-				val = (char)touch.py;
-			buf[i] = val;
-		}
+		// counter++;
+		// if (counter % 2 != 0) continue;
 
+		int new_x = touch.px;
+		int new_y = touch.py;
+		if (new_x == buf[0] && new_y == buf[1]) continue;
+
+		buf[0] = new_x;
+		buf[1] = new_y;
+		// for (size_t i = 0; i < BUFLEN; i++) {
+		// 	char val = 0;
+		// 	if (i % 3 == 0)
+		// 		val = (char);
+		// 	else if (i % 3 == 1)
+		// 		val = (char)touch.py;
+		// 	buf[i] = val;
+		// }
+	// for (size_t i = 1; i < 2; i++) {
+		// ip[11] = (i / 10) + 0x30;
+		// ip[12] = i % 10 + 0x30;
+		// printf("ip: %s\n", ip);
+
+
+		p = servinfo;
 		if ((numbytes = sendto(sockfd, buf, BUFLEN, 0, p->ai_addr,
 			p->ai_addrlen)) == -1) {
-			printf("[error] send gefailed");
+			printf("[error] send gefailed\n");
 		}
+		// }
+
+
 	}
 
 	freeaddrinfo(servinfo);
