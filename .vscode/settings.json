@@ -1,0 +1,25 @@
+{
+"C_Cpp.formatting": "vcFormat",
+"C_Cpp.vcFormat.newLine.beforeOpenBrace.block": "sameLine",
+"C_Cpp.vcFormat.newLine.beforeOpenBrace.function": "sameLine",
+"C_Cpp.vcFormat.newLine.beforeOpenBrace.lambda": "sameLine",
+"C_Cpp.vcFormat.newLine.beforeOpenBrace.namespace": "sameLine",
+"C_Cpp.vcFormat.newLine.beforeOpenBrace.type": "sameLine",
+"C_Cpp.vcFormat.newLine.closeBraceSameLine.emptyFunction": true,
+"C_Cpp.clang_format_style": "Google",
+"C_Cpp.default.compilerPath": "/opt/devkitpro/devkitARM/bin/arm-none-eabi-gcc",
+
+"C_Cpp.default.includePath": [
+    "${workspaceFolder}/**",
+    "/opt/devkitpro/libnds/include/**",
+    "/opt/devkitpro/libctru/include/**",
+    "/opt/devkitpro/devkitARM/include/**",
+    "/opt/devkitpro/devkitARM/arm-none-eabi/include/**"
+],
+"C_Cpp.default.defines": [
+    "ARM9"
+],
+"files.associations": {
+    "unistd.h": "c"
+},
+}
