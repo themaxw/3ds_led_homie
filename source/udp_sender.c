@@ -12,6 +12,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <math.h>
 
 #define SOC_ALIGN 0x1000
 #define SOC_BUFFERSIZE 0x100000
@@ -25,7 +26,8 @@ static u32* SOC_buffer = NULL;
 
 __attribute__((format(printf, 1, 2))) void failExit(const char* fmt, ...);
 
-char ip[] = "192.168.0.255";
+// const static char ip[] = "192.168.0.111";
+const static char ip[] = "192.168.0.255";
 
 
 // const static char ip[] = "127.0.0.1";
@@ -46,6 +48,106 @@ void send_buf(int sock, const void* buf, size_t bufsize, const struct addrinfo* 
 		printf("[error] send gefailed");
 	}
 }
+
+void HSVToRGB(float hue, float sat, float val) {
+	float r = 0, g = 0, b = 0;
+
+	if (sat == 0) {
+		r = val;
+		g = val;
+		b = val;
+	}
+	else {
+		int i;
+		float f, p, q, t;
+
+		if (hue == 360)
+			hue = 0;
+		else
+			hue = hue / 60;
+
+		i = (int)trunc(hue);
+		f = hue - i;
+
+		p = val * (1.0f - sat);
+		q = val * (1.0f - (sat * f));
+		t = val * (1.0f - (sat * (1.0f - f)));
+
+		switch (i) {
+		case 0:
+			r = val;
+			g = t;
+			b = p;
+			break;
+
+		case 1:
+			r = q;
+			g = val;
+			b = p;
+			break;
+
+		case 2:
+			r = p;
+			g = val;
+			b = t;
+			break;
+
+		case 3:
+			r = p;
+			g = q;
+			b = val;
+			break;
+
+		case 4:
+			r = t;
+			g = p;
+			b = val;
+			break;
+
+		default:
+			r = val;
+			g = p;
+			b = q;
+			break;
+		}
+
+	}
+	buf[0] = r * 255;
+	buf[1] = g * 255;
+	buf[2] = b * 255;
+}
+
+int old_x = 0;
+int old_y = 0;
+
+int update_color() {
+	hidScanInput();
+
+	touchPosition touch;
+
+	// Read the touch screen coordinates
+	hidTouchRead(&touch);
+
+
+	u32 keys = hidKeysDownRepeat();
+	if (keys & KEY_START) return -1;
+	if (!(keys & KEY_TOUCH)) return 0;
+
+	int new_x = touch.px;
+	int new_y = touch.py;
+
+	if (new_x == old_x && new_y == old_y) return 0;
+	HSVToRGB(1.125f * (float)new_x, 1.0f, ((float)new_y) / SIZE_TOUCH_Y);
+	printf("%f, %f\n", 1.125f * (float)new_x, ((float)new_y));
+	// buf[0] = old_x;
+	// buf[1] = old_y;
+	old_x = new_x;
+	old_y = new_y;
+
+	return 1;
+}
+
+
 
 int main(int argc, char** argv) {
 	int rv;
@@ -83,8 +185,6 @@ int main(int argc, char** argv) {
 
 	// libctru provides BSD sockets so most code from here is standard
 
-
-
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		failExit("talker: socket");
 	}
@@ -92,62 +192,24 @@ int main(int argc, char** argv) {
 	int broadcastEnable = 1;
 	setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
 
-	// if (p == NULL) {
-	// 	failExit("talker: failed to create socket\n");
-	// }
-
-	// if ((numbytes = sendto(sockfd, buf, strlen(buf), 0,
-	//          p->ai_addr, p->ai_addrlen)) == -1) {
-	//     printf("[error] send gefailed");
-	// }
-	unsigned int counter = 0;
 
 	if ((rv = getaddrinfo(ip, SERVERPORT, &hints, &servinfo)) != 0) {
 		printf("get_addr_info %s\n", gai_strerror(rv));
 	}
 
 	while (aptMainLoop()) {
-		gspWaitForVBlank();
+		rv = update_color();
+		if (rv == -1) break;
+		else if (rv == 0) continue;
+		else {
 
-		hidScanInput();
-
-		touchPosition touch;
-
-		// Read the touch screen coordinates
-		hidTouchRead(&touch);
-		// printf("\x1b\n[2;0H%03d; %03d", touch.px, touch.py);
-
-		// counter++;
-		// if (counter % 2 != 0) continue;
-
-		int new_x = touch.px;
-		int new_y = touch.py;
-		if (new_x == buf[0] && new_y == buf[1]) continue;
-
-		buf[0] = new_x;
-		buf[1] = new_y;
-		// for (size_t i = 0; i < BUFLEN; i++) {
-		// 	char val = 0;
-		// 	if (i % 3 == 0)
-		// 		val = (char);
-		// 	else if (i % 3 == 1)
-		// 		val = (char)touch.py;
-		// 	buf[i] = val;
-		// }
-	// for (size_t i = 1; i < 2; i++) {
-		// ip[11] = (i / 10) + 0x30;
-		// ip[12] = i % 10 + 0x30;
-		// printf("ip: %s\n", ip);
-
-
-		p = servinfo;
-		if ((numbytes = sendto(sockfd, buf, BUFLEN, 0, p->ai_addr,
-			p->ai_addrlen)) == -1) {
-			printf("[error] send gefailed\n");
+			p = servinfo;
+			if ((numbytes = sendto(sockfd, buf, BUFLEN, 0, p->ai_addr,
+				p->ai_addrlen)) == -1) {
+				printf("[error] send gefailed\n");
+			}
 		}
-		// }
-
-
+		gspWaitForVBlank();
 	}
 
 	freeaddrinfo(servinfo);
@@ -157,10 +219,7 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-//---------------------------------------------------------------------------------
 void failExit(const char* fmt, ...) {
-	//---------------------------------------------------------------------------------
-
 	if (sockfd > 0) close(sockfd);
 
 	va_list ap;
